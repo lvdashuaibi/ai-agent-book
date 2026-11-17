@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Loop · 本地实验台</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand"><span class="brand-icon" aria-hidden="true">↻</span><div><strong>Agent Loop</strong><span class="brand-description">上下文实验台</span></div></div>
+    <div class="header-actions">
+      <span class="model-tag"><span class="status-dot"></span><span id="model">DeepSeek</span></span>
+      <button id="reset" class="button secondary"><span aria-hidden="true">＋</span> 新对话</button>
+      <button id="toggle-inspector" class="button icon-button" aria-label="显示或隐藏运行详情" aria-expanded="true" title="运行详情">◫</button>
+    </div>
+  </header>
+  <main class="app-layout" id="layout">
+    <section class="chat-panel" aria-label="对话">
+      <div class="chat-heading"><h1>当前对话</h1><span id="turn-count" class="subtle">0 轮对话</span></div>
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <div class="composer-area">
+        <form id="chat-form" class="composer">
+          <label class="sr-only" for="prompt">输入你的问题</label>
+          <textarea id="prompt" rows="2" placeholder="输入问题，或从一句自我介绍开始…" required></textarea>
+          <div class="composer-bottom"><span id="input-hint">Enter 发送 <span class="hint-separator">·</span> Shift + Enter 换行</span><button id="send" class="send-button" type="submit" disabled aria-label="发送消息"><span>发送</span><span aria-hidden="true">↑</span></button></div>
+        </form>
+        <p id="notice" class="notice" role="status"></p>
+      </div>
+    </section>
+    <aside id="inspector" class="inspector" aria-label="运行详情">
+      <div class="inspector-heading"><h2>运行详情</h2><button id="close-inspector" class="button icon-button" aria-label="收起运行详情">×</button></div>
+      <label for="turn-picker" class="sr-only">选择要查看的轮次或历史调用</label>
+      <select id="turn-picker" class="turn-picker"><option value="">等待第一轮对话</option></select>
+      <div class="inspector-tabs" role="tablist" aria-label="运行详情视图">
+        <button id="context-tab" role="tab" aria-selected="true" aria-controls="context-view" class="active">上下文 <span id="context-count">0</span></button>
+        <button id="trace-tab" role="tab" aria-selected="false" aria-controls="trace-view" tabindex="-1">Trace</button>
+      </div>
+      <section id="context-view" class="inspector-content" role="tabpanel" aria-labelledby="context-tab">
+        <div class="section-toolbar"><span id="context-caption">每轮实际发送的消息</span><div><button id="json-toggle" class="text-button" aria-pressed="false">JSON</button><button id="copy-context" class="text-button" title="复制完整上下文">复制</button></div></div>
+        <label for="step-picker" class="sr-only">选择本轮的模型调用步骤</label>
+        <select id="step-picker" class="step-picker" hidden></select>
+        <details class="tool-definitions"><summary>可用工具 <span id="tool-count">2</span></summary><p>通过请求顶层的 tools 字段传入模型。</p><pre id="tool-definitions" class="json-block"></pre></details>
+        <div id="context-empty" class="inspector-empty"><span class="empty-icon" aria-hidden="true">{ }</span><h3>看见 Agent 的上下文</h3><p>发送一条消息后，这里会显示系统提示词、历史对话和当前输入。</p></div>
+        <div id="context-cards"></div>
+        <pre id="context-json" class="json-block" tabindex="0" hidden>[]</pre>
+      </section>
+      <section id="trace-view" class="inspector-content" role="tabpanel" aria-labelledby="trace-tab" hidden>
+        <div class="section-toolbar"><span>本轮调用记录</span><button id="refresh" class="text-button">刷新</button></div>
+        <div id="trace-empty" class="inspector-empty"><span class="empty-icon" aria-hidden="true">↗</span><h3>一轮对话，一条 trace</h3><p>模型回复后，查看 token 用量、耗时和完整调用记录。</p></div>
+        <div id="trace-detail" hidden>
+          <div class="trace-status-row"><span id="trace-status" class="status-label"></span><span id="trace-time" class="subtle"></span></div>
+          <div class="metrics"><div><span>输入 token</span><strong id="input-tokens">—</strong></div><div><span>输出 token</span><strong id="output-tokens">—</strong></div><div><span>总 token</span><strong id="total-tokens">—</strong></div><div><span>耗时</span><strong id="latency">—</strong></div></div>
+          <section class="cache-summary" aria-labelledby="cache-heading">
+            <h3 id="cache-heading">输入缓存复用</h3>
+            <div class="metrics"><div><span>缓存命中 token</span><strong id="cache-hit-tokens">—</strong></div><div><span>缓存命中率</span><strong id="cache-hit-rate">—</strong></div></div>
+            <p class="cache-caption">未命中 token：<span id="cache-miss-tokens">—</span> · 按输入 token 统计</p>
+          </section>
+          <dl class="trace-meta"><dt>模型</dt><dd id="trace-model"></dd><dt>结束原因</dt><dd id="stop-reason"></dd><dt>Trace ID</dt><dd id="selected-trace"></dd></dl>
+          <div id="model-calls"></div>
+          <div id="tool-calls"></div>
+          <div class="trace-output"><h3>Agent 返回</h3><div id="trace-reply" class="prose"></div></div>
+          <details class="raw-details"><summary>原始 OpenTelemetry spans</summary><div class="raw-toolbar"><button id="copy-trace" class="text-button">复制 JSON</button></div><pre id="trace-json" class="json-block" tabindex="0"></pre></details>
+          <p class="data-note">整轮 token 为各次模型调用的 API usage 之和。缓存命中率 = 命中 token 总数 ÷（命中 + 未命中 token 总数），不包含输出。缺少数据或输入为零时，命中率显示“未知”。记录保存在本地 traces/spans.jsonl。</p>
+        </div>
+      </section>
+      <footer class="inspector-footer"><span class="status-dot"></span><span id="record-count">本地 trace 自动保存</span></footer>
+    </aside>
+  </main>
+</body>
+</html>

@@ -50,7 +50,7 @@
 
 | Agent 产品 | 眼睛（感知） | 手脚（行动） | 策略 |
 |----------------|----------------------|----------------------------|------------------------------|
-| **Cursor 等 Coding Agent** | 需求、读取到的代码片段、目录列表、终端输出 | 开放式（代码搜索、文件读写、执行命令等） | 增量开发：理解需求→搜索相关代码→编辑代码→测试验证→调试修复 |
+| **Cursor、OpenAI Codex、Anthropic Claude Code 等 Coding Agent** | 需求、读取到的代码片段、目录列表、终端输出 | 开放式（代码搜索、文件读写、执行命令等） | 增量开发：理解需求→搜索相关代码→编辑代码→测试验证→调试修复 |
 | **Deep Research 等搜索 Agent** | 搜索结果、网页内容、论文摘要与引用 | 开放式（搜索查询、网页读取、生成报告等） | 迭代深化：根据已有信息调整搜索方向，逐步综合出完整报告 |
 | **Browser Use 等电脑操控 Agent** | 屏幕截图、DOM 或无障碍树、操作结果 | 开放式（点击、输入、滚动、截图、执行代码等） | 视觉感知+操作：观察屏幕→识别目标元素→执行操作→验证结果 |
 | **豆包等手机助手 Agent** | 手机截图、App 界面状态、系统反馈 | 开放式（点击、滑动、输入、打开 App 等） | 意图理解+App 操控：理解用户需求→定位目标 App→执行操作→确认完成 |
@@ -120,7 +120,15 @@ LLM Agent 的一个独特能力是**内部思考**——在采取实际行动之
 
 但这里悬着一个更深的问题：如果模型持续变强，今天这些 Harness 会不会最终被模型“吃掉”？Rich Sutton 在《苦涩的教训》（The Bitter Lesson）中回顾了 AI 研究七十年间反复上演的一幕[^ch1-1]：研究者一次次把自己对领域的理解编码进系统，短期见效，长期却总是输给能随算力与数据规模持续扩展的通用方法——搜索与学习。以此衡量，Harness 里的约束、验证与纠正，有多少属于“人类先验”，注定会被模型内化？本书的立场是：**方向认同，节奏务实**。方向上，本书不怀疑模型会持续吃掉 Harness——工具调用、长程规划都曾靠外部编排，如今已是模型的原生能力；但在节奏上，这个“吃”的过程远比想象中慢：训练以月计，模型也无法一次内化真实业务中所有的约束与偏好，模型此刻的能力边界，就是 Harness 此刻的价值所在。因此 Harness 工程不是对苦涩的教训的抵抗，而是这一教训在工程时间尺度上的实践：模型还做不稳的，Harness 先补上；模型每内化一层，Harness 就卸下一层，转而兜底新的能力前沿。
 
+哪些环节可以交给模型？OpenAI 在 2026 年 9 月的 Codex 开发指南中举了一个例子。若项目规定“每次编辑前都要阅读架构、数据库和部署文档”，改一个错别字也得读完三份文档。随着模型判断任务所需信息的能力提高，团队可以改为说明每份文档适用于什么问题，让模型按需选择。这里可以省去的是预先规定的阅读步骤。至于模型有权读取哪些文件、哪些操作需要用户批准，Codex 仍通过 Harness 执行相应的沙箱和审批规则。[^ch1-codex-harness]
+
+Anthropic 则在一项长时间开发应用的实验中，逐项检验了旧流程还有多少作用。使用 Claude Opus 4.5 时，团队把开发过程拆成多个短周期，每轮结束都评估成果。换用 Opus 4.6 后，团队取消了强制分段，模型在一次构建中连续工作了两个多小时。团队保留了前期规划和构建后的评估：省去规划时，模型容易把功能范围定得过窄；遇到模型尚难独立完成的功能时，单独评估仍能发现问题。这个实验给“模型每内化一层，Harness 就卸下一层”提供了一个可操作的判断方法：换模型后，每次撤掉一个环节，用真实任务检验交付质量。[^ch1-claude-harness]
+
 [^ch1-1]: Sutton, Rich. "The Bitter Lesson", 2019. http://www.incompleteideas.net/IncIdeas/BitterLesson.html
+
+[^ch1-codex-harness]: OpenAI Developers. [Rethinking skills and prompts for GPT-6 Astra](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)，2026 年 9 月；[Codex as a platform: build on the open agent harness](https://developers.openai.com/blog/codex-as-a-platform)，2026 年 8 月。
+
+[^ch1-claude-harness]: Anthropic. [Harness design for long-running application development](https://www.anthropic.com/research/harness-design-long-running-apps)，2026 年 3 月。
 
 #### Agent 的学习机制：从上下文适应到持久更新
 
@@ -141,10 +149,26 @@ LLM Agent 的一个独特能力是**内部思考**——在采取实际行动之
 - **系统提示词**（System Prompt）：与用户每次输入的提示词不同，系统提示词由开发者编写，在整个对话过程中保持不变，相当于 Agent 的“岗位说明书”——定义它的身份、权限和行为准则。通过提示工程（Prompt Engineering）精心设计系统提示词，我们可以塑造 Agent 的工作方式。系统提示词中还会包含跨会话保存的**用户记忆**（用户偏好、历史行为、背景设定等个性化信息，详见第三章）和动态注入的环境状态。
 - **工具定义**（Tool Definitions）：声明 Agent 可用工具的名称、功能描述和参数格式。没有工具定义，Agent 就无法识别和调用任何工具，但它并不会因此停下来——消融实验（实验 1-1）会说明这一点。工具定义与系统提示词一起构成对话中保持不变的**静态前缀**（这是基础模式；2026 年以来，生产框架中工具的完整 schema 也可以按需动态加载到上下文末尾而不破坏前缀，详见第二章工具定义一节和第四章）。
 - **用户消息**（User Messages）：来自用户的输入。用户消息中还可能包含通过 RAG（检索增强生成，Retrieval-Augmented Generation，详见第三章）动态检索引入的**外部知识**——覆盖训练数据截止后的信息或私有领域知识。
-- **模型回复**（Assistant Messages）：模型之前生成的回复，最多包含三个部分——思考过程（`reasoning`，即内部思考链，用于保持思维的连贯性和决策的可解释性）、文本内容（`content`，即对用户的回复）和工具调用请求（`tool_calls`，即 Agent 采取行动的方式）。在一次具体的回复中，三者不一定同时出现：例如 Agent 决定调用工具时通常只有 `reasoning` + `tool_calls`，给出最终回答时通常只有 `reasoning` + `content`。
+- **模型回复**（Assistant Messages）：模型可以生成给用户看的文本，也可以向应用请求调用工具。以 OpenAI Chat Completions 为例，文本放在 `content` 字段，函数调用请求放在 `tool_calls` 字段。推理模型还可以在内部推理，但应用能看到什么取决于模型和接口：例如 OpenAI 不公开原始推理链，部分模型支持返回推理摘要。因此，不能假定每条回复都有一个可读的 `reasoning` 字段。参见 [OpenAI 推理文档](https://developers.openai.com/api/docs/guides/reasoning)。
 - **工具执行结果**（Tool Results）：Agent 框架执行工具后返回的结果。这些结果是 Agent 下一步思考的直接依据，也让它能够从执行结果中学习、避免重复犯错。
 
 前两项（系统提示词 + 工具定义）是静态前缀，后三项（用户消息 + 模型回复 + 工具执行结果）是随交互不断增长的动态消息历史。这五个部分共同构成了 LLM 每次推理时的上下文。
+
+**例：查一笔订单。** 用户问“订单 A17 发货了吗？”。应用事先在请求的 `tools` 中声明了函数 `get_order_status`，说明它能查询订单状态，并规定必填参数 `order_id` 是字符串。模型可以选择调用它。下面是 Chat Completions 返回的助理消息示意，仅列出相关字段：
+
+```json
+{
+  "role": "assistant",
+  "content": null,
+  "tool_calls": [{
+    "id": "call_1",
+    "type": "function",
+    "function": {"name": "get_order_status", "arguments": "{\"order_id\":\"A17\"}"}
+  }]
+}
+```
+
+应用直接读取 `message.tool_calls`，解码并校验 `arguments`，然后调用自己的订单系统。假设查到“已发货”，应用在消息历史中保留上面的助理消息，追加工具结果 `{"role":"tool","tool_call_id":"call_1","content":"已发货"}`，再请求一次模型。模型这时就可以用 `content` 回答“订单 A17 已发货”。这里需要解析的是指定字段里的函数参数，无需从回复正文里搜索 `tool_calls`。如果使用只返回文本的接口，也可以自行约定让模型输出一段 JSON，再编写解析和校验逻辑；那属于应用自定义的文本协议。参见 [OpenAI 函数调用文档](https://developers.openai.com/api/docs/guides/function-calling)。
 
 要验证每个组件是否都不可或缺，最直接的方法是**消融实验**（Ablation Study）：就像医生诊断时逐一排除病因——先去掉 A 组件看系统是否还正常，再去掉 B 组件，以此类推，从而判断每个组件的贡献。实验 1-1 正是按这个思路，对上述五个组件做了系统性测试。
 

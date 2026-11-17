@@ -1,0 +1,6 @@
+openai>=2.8,<3
+python-dotenv>=1,<2
+httpx>=0.28,<1
+tzdata>=2025
+opentelemetry-sdk>=1,<2
+openinference-instrumentation-openai>=0.1.73,<1
